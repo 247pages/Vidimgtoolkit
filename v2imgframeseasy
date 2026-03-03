@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Frame Extractor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 20px;
+        }
+        
+        .upload-area {
+            border: 3px dashed #667eea;
+            border-radius: 10px;
+            padding: 40px 20px;
+            text-align: center;
+            margin-bottom: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .upload-area:hover {
+            background: #f8f9ff;
+            border-color: #764ba2;
+        }
+        
+        .upload-icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+        
+        input[type="file"] {
+            display: none;
+        }
+        
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 5px;
+            transition: background 0.3s;
+        }
+        
+        button:hover {
+            background: #764ba2;
+        }
+        
+        button:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+        }
+        
+        .video-preview {
+            width: 100%;
+            max-height: 300px;
+            margin: 20px 0;
+            border-radius: 10px;
+            display: none;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 20px;
+            display: none;
+        }
+        
+        .frame-viewer {
+            display: none;
+            margin-top: 30px;
+        }
+        
+        .frame-container {
+            width: 100%;
+            height: 400px;
+            background: black;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+        
+        .current-frame {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+        
+        .frame-info {
+            text-align: center;
+            color: #333;
+            margin: 10px 0;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        
+        .thumbnail-strip {
+            display: flex;
+            overflow-x: auto;
+            gap: 10px;
+            padding: 10px;
+            background: #f0f0f0;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        
+        .thumbnail {
+            width: 120px;
+            height: 80px;
+            border-radius: 5px;
+            overflow: hidden;
+            cursor: pointer;
+            flex-shrink: 0;
+            border: 3px solid transparent;
+        }
+        
+        .thumbnail.active {
+            border-color: #2196F3;
+        }
+        
+        .thumbnail img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        .navigation {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin: 20px 0;
+        }
+        
+        .controls {
+            text-align: center;
+            margin-top: 20px;
+        }
+        
+        .download-section {
+            background: #f8f9ff;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 20px;
+            display: none;
+        }
+        
+        .selected-frames {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px;
+            }
+            
+            .frame-container {
+                height: 300px;
+            }
+            
+            .thumbnail {
+                width: 100px;
+                height: 70px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📹 Video Frame Extractor</h1>
+        
+        <div class="upload-area" id="uploadArea" onclick="document.getElementById('videoInput').click()">
+            <div class="upload-icon">📁</div>
+            <h3>Click to Select Video File</h3>
+            <p>Or drag and drop your video here</p>
+            <p style="color: #666; margin-top: 10px;">Supported: MP4, MOV, AVI, WEBM, etc.</p>
+        </div>
+        
+        <input type="file" id="videoInput" accept="video/*">
+        
+        <div class="controls">
+            <video id="videoPreview" class="video-preview" controls></video>
+            <div>
+                <button id="processBtn" onclick="processVideo()" disabled>Extract Frames</button>
+                <button id="resetBtn" onclick="resetAll()" disabled>Reset</button>
+            </div>
+        </div>
+        
+        <div class="loading" id="loading">
+            <div style="font-size: 48px; margin-bottom: 10px;">⏳</div>
+            <p>Processing video...</p>
+            <p id="progressText"></p>
+        </div>
+        
+        <div class="frame-viewer" id="frameViewer">
+            <h2 style="text-align: center; margin-bottom: 20px;">Frame Viewer</h2>
+            
+            <div class="frame-container">
+                <img id="currentFrame" class="current-frame">
+                <div id="noFramesMessage" style="color: white; text-align: center;">
+                    <div style="font-size: 48px; margin-bottom: 10px;">📷</div>
+                    <p>No frames loaded</p>
+                </div>
+            </div>
+            
+            <div class="frame-info" id="frameInfo"></div>
+            
+            <div class="navigation">
+                <button onclick="previousFrame()">◀ Previous</button>
+                <button onclick="firstFrame()">⏮ First</button>
+                <button onclick="lastFrame()">Last ⏭</button>
+                <button onclick="nextFrame()">Next ▶</button>
+            </div>
+            
+            <div style="text-align: center; margin: 20px 0;">
+                <input type="range" id="frameSlider" min="0" max="100" value="0" style="width: 100%; max-width: 400px;">
+            </div>
+            
+            <div class="thumbnail-strip" id="thumbnailStrip">
+                <!-- Thumbnails will be added here -->
+            </div>
+            
+            <div style="text-align: center; margin: 20px 0;">
+                <button onclick="selectCurrentFrame()" id="selectBtn">Select Frame</button>
+                <button onclick="downloadCurrentFrame()" style="background: #4CAF50;">Download This Frame</button>
+                <button onclick="selectAllFrames()" style="background: #2196F3;">Select All</button>
+                <button onclick="clearSelection()" style="background: #f44336;">Clear All</button>
+            </div>
+            
+            <div class="download-section" id="downloadSection">
+                <h3>Selected Frames (<span id="selectedCount">0</span>)</h3>
+                <div class="selected-frames" id="selectedFrames">
+                    <!-- Selected frames will be added here -->
+                </div>
+                <div style="text-align: center; margin-top: 20px;">
+                    <button onclick="downloadSelectedFrames()" style="background: #FF9800; padding: 15px 30px; font-size: 18px;">
+                        📥 Download Selected Frames
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let frames = [];
+        let currentFrameIndex = 0;
+        let selectedFrames = new Set();
+        let videoFile = null;
+        
+        // DOM elements
+        const videoInput = document.getElementById('videoInput');
+        const videoPreview = document.getElementById('videoPreview');
+        const processBtn = document.getElementById('processBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const loading = document.getElementById('loading');
+        const progressText = document.getElementById('progressText');
+        const frameViewer = document.getElementById('frameViewer');
+        const currentFrame = document.getElementById('currentFrame');
+        const noFramesMessage = document.getElementById('noFramesMessage');
+        const frameInfo = document.getElementById('frameInfo');
+        const frameSlider = document.getElementById('frameSlider');
+        const thumbnailStrip = document.getElementById('thumbnailStrip');
+        const selectBtn = document.getElementById('selectBtn');
+        const downloadSection = document.getElementById('downloadSection');
+        const selectedCount = document.getElementById('selectedCount');
+        const selectedFramesDiv = document.getElementById('selectedFrames');
+        const uploadArea = document.getElementById('uploadArea');
+        
+        // Event listeners
+        videoInput.addEventListener('change', handleFileSelect);
+        
+        // Drag and drop
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.style.borderColor = '#764ba2';
+            uploadArea.style.background = '#f0f0ff';
+        });
+        
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.style.borderColor = '#667eea';
+            uploadArea.style.background = 'white';
+        });
+        
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.style.borderColor = '#667eea';
+            uploadArea.style.background = 'white';
+            
+            if (e.dataTransfer.files.length) {
+                handleFile(e.dataTransfer.files[0]);
+            }
+        });
+        
+        // Frame slider
+        frameSlider.addEventListener('input', (e) => {
+            const index = parseInt(e.target.value);
+            if (index >= 0 && index < frames.length) {
+                showFrame(index);
+            }
+        });
+        
+        // File handling
+        function handleFileSelect(e) {
+            if (e.target.files.length) {
+                handleFile(e.target.files[0]);
+            }
+        }
+        
+        function handleFile(file) {
+            console.log('File selected:', file.name, file.type, file.size);
+            
+            if (!file.type.startsWith('video/')) {
+                alert('Please select a video file (MP4, MOV, AVI, etc.)');
+                return;
+            }
+            
+            // Reset previous data
+            resetAll();
+            
+            // Store file
+            videoFile = file;
+            
+            // Show video preview
+            const videoURL = URL.createObjectURL(file);
+            videoPreview.src = videoURL;
+            videoPreview.style.display = 'block';
+            
+            // Enable buttons
+            processBtn.disabled = false;
+            resetBtn.disabled = false;
+            
+            console.log('Video loaded successfully');
+        }
+        
+        // Process video and extract frames
+        async function processVideo() {
+            if (!videoFile) return;
+            
+            console.log('Starting frame extraction...');
+            
+            // Show loading
+            loading.style.display = 'block';
+            processBtn.disabled = true;
+            
+            try {
+                // Create video element
+                const video = document.createElement('video');
+                video.src = URL.createObjectURL(videoFile);
+                video.muted = true;
+                video.crossOrigin = 'anonymous';
+                
+                // Wait for video to load
+                await new Promise((resolve, reject) => {
+                    video.onloadedmetadata = resolve;
+                    video.onerror = reject;
+                    setTimeout(reject, 10000); // Timeout after 10 seconds
+                });
+                
+                console.log('Video metadata loaded:', video.videoWidth, 'x', video.videoHeight);
+                
+                // Create canvas for frame capture
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                
+                // Set canvas size
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                
+                // Calculate frame extraction parameters
+                const duration = video.duration;
+                console.log('Video duration:', duration, 'seconds');
+                
+                // Extract frames (max 50 for performance)
+                const frameCount = Math.min(Math.floor(duration * 5), 50);
+                console.log('Will extract', frameCount, 'frames');
+                
+                frames = [];
+                
+                for (let i = 0; i < frameCount; i++) {
+                    // Calculate time for this frame
+                    const time = (duration / frameCount) * i;
+                    
+                    // Update progress
+                    progressText.textContent = `Extracting frame ${i + 1} of ${frameCount}...`;
+                    
+                    // Seek to time
+                    video.currentTime = time;
+                    
+                    // Wait for seek to complete
+                    await new Promise(resolve => {
+                        video.onseeked = () => {
+                            // Draw video frame to canvas
+                            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                            
+                            // Convert to data URL
+                            const dataURL = canvas.toDataURL('image/jpeg', 0.9);
+                            
+                            // Store frame
+                            frames.push({
+                                index: i,
+                                time: time,
+                                dataURL: dataURL
+                            });
+                            
+                            resolve();
+                        };
+                    });
+                }
+                
+                console.log('Successfully extracted', frames.length, 'frames');
+                
+                // Hide loading
+                loading.style.display = 'none';
+                
+                // Show frame viewer
+                frameViewer.style.display = 'block';
+                
+                // Setup UI
+                setupFrameViewer();
+                
+                // Show first frame
+                if (frames.length > 0) {
+                    showFrame(0);
+                }
+                
+            } catch (error) {
+                console.error('Error processing video:', error);
+                loading.innerHTML = `
+                    <div style="color: #f44336; font-size: 48px;">❌</div>
+                    <p style="color: #f44336;">Error processing video</p>
+                    <p>${error.message}</p>
+                    <button onclick="resetAll()" style="margin-top: 20px;">Try Again</button>
+                `;
+            }
+        }
+        
+        function setupFrameViewer() {
+            // Clear thumbnails
+            thumbnailStrip.innerHTML = '';
+            
+            // Create thumbnails
+            frames.forEach((frame, index) => {
+                const thumbnail = document.createElement('div');
+                thumbnail.className = 'thumbnail';
+                thumbnail.onclick = () => showFrame(index);
+                
+                const img = document.createElement('img');
+                img.src = frame.dataURL;
+                img.alt = `Frame ${index + 1}`;
+                
+                thumbnail.appendChild(img);
+                thumbnailStrip.appendChild(thumbnail);
+            });
+            
+            // Setup slider
+            frameSlider.max = frames.length - 1;
+            frameSlider.value = 0;
+            
+            // Update frame info
+            updateFrameInfo();
+        }
+        
+        function showFrame(index) {
+            if (index < 0 || index >= frames.length) return;
+            
+            currentFrameIndex = index;
+            const frame = frames[index];
+            
+            // Show frame
+            currentFrame.src = frame.dataURL;
+            currentFrame.style.display = 'block';
+            noFramesMessage.style.display = 'none';
+            
+            // Update slider
+            frameSlider.value = index;
+            
+            // Update active thumbnail
+            document.querySelectorAll('.thumbnail').forEach((thumb, i) => {
+                thumb.classList.toggle('active', i === index);
+                
+                // Scroll to active thumbnail
+                if (i === index) {
+                    thumb.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+                }
+            });
+            
+            // Update frame info
+            updateFrameInfo();
+            
+            // Update select button
+            updateSelectButton();
+        }
+        
+        function updateFrameInfo() {
+            const frame = frames[currentFrameIndex];
+            if (!frame) return;
+            
+            const minutes = Math.floor(frame.time / 60);
+            const seconds = Math.floor(frame.time % 60);
+            const ms = Math.floor((frame.time % 1) * 1000);
+            
+            frameInfo.textContent = `Frame ${currentFrameIndex + 1} of ${frames.length} - Time: ${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}.${ms.toString().padStart(3, '0')}`;
+        }
+        
+        function updateSelectButton() {
+            if (selectedFrames.has(currentFrameIndex)) {
+                selectBtn.textContent = '✓ Selected';
+                selectBtn.style.background = '#4CAF50';
+            } else {
+                selectBtn.textContent = 'Select Frame';
+                selectBtn.style.background = '#667eea';
+            }
+        }
+        
+        // Navigation functions
+        function previousFrame() {
+            if (currentFrameIndex > 0) {
+                showFrame(currentFrameIndex - 1);
+            }
+        }
+        
+        function nextFrame() {
+            if (currentFrameIndex < frames.length - 1) {
+                showFrame(currentFrameIndex + 1);
+            }
+        }
+        
+        function firstFrame() {
+            if (frames.length > 0) {
+                showFrame(0);
+            }
+        }
+        
+        function lastFrame() {
+            if (frames.length > 0) {
+                showFrame(frames.length - 1);
+            }
+        }
+        
+        // Selection functions
+        function selectCurrentFrame() {
+            if (selectedFrames.has(currentFrameIndex)) {
+                selectedFrames.delete(currentFrameIndex);
+            } else {
+                selectedFrames.add(currentFrameIndex);
+            }
+            
+            updateSelectButton();
+            updateSelectionDisplay();
+        }
+        
+        function selectAllFrames() {
+            for (let i = 0; i < frames.length; i++) {
+                selectedFrames.add(i);
+            }
+            updateSelectionDisplay();
+        }
+        
+        function clearSelection() {
+            selectedFrames.clear();
+            updateSelectionDisplay();
+        }
+        
+        function updateSelectionDisplay() {
+            const count = selectedFrames.size;
+            selectedCount.textContent = count;
+            
+            if (count > 0) {
+                downloadSection.style.display = 'block';
+                
+                // Update selected frames display
+                selectedFramesDiv.innerHTML = '';
+                selectedFrames.forEach(index => {
+                    const frame = frames[index];
+                    const frameDiv = document.createElement('div');
+                    frameDiv.className = 'thumbnail';
+                    frameDiv.style.cursor = 'pointer';
+                    frameDiv.onclick = () => showFrame(index);
+                    
+                    const img = document.createElement('img');
+                    img.src = frame.dataURL;
+                    img.alt = `Frame ${index + 1}`;
+                    
+                    frameDiv.appendChild(img);
+                    selectedFramesDiv.appendChild(frameDiv);
+                });
+            } else {
+                downloadSection.style.display = 'none';
+            }
+            
+            updateSelectButton();
+        }
+        
+        // Download functions
+        function downloadCurrentFrame() {
+            const frame = frames[currentFrameIndex];
+            downloadImage(frame.dataURL, `frame_${currentFrameIndex + 1}.jpg`);
+        }
+        
+        function downloadSelectedFrames() {
+            if (selectedFrames.size === 0) return;
+            
+            if (selectedFrames.size === 1) {
+                const index = Array.from(selectedFrames)[0];
+                const frame = frames[index];
+                downloadImage(frame.dataURL, `frame_${index + 1}.jpg`);
+                return;
+            }
+            
+            // Download multiple frames with delay
+            let delay = 0;
+            selectedFrames.forEach(index => {
+                setTimeout(() => {
+                    const frame = frames[index];
+                    downloadImage(frame.dataURL, `frame_${index + 1}.jpg`);
+                }, delay);
+                delay += 300; // 300ms delay between downloads
+            });
+            
+            alert(`Downloading ${selectedFrames.size} frames... Check your downloads folder.`);
+        }
+        
+        function downloadImage(dataURL, filename) {
+            const link = document.createElement('a');
+            link.href = dataURL;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+        
+        // Reset function
+        function resetAll() {
+            // Reset variables
+            frames = [];
+            currentFrameIndex = 0;
+            selectedFrames.clear();
+            videoFile = null;
+            
+            // Reset UI
+            videoPreview.src = '';
+            videoPreview.style.display = 'none';
+            loading.style.display = 'none';
+            frameViewer.style.display = 'none';
+            downloadSection.style.display = 'none';
+            processBtn.disabled = true;
+            resetBtn.disabled = true;
+            
+            // Clear thumbnails
+            thumbnailStrip.innerHTML = '';
+            selectedFramesDiv.innerHTML = '';
+            
+            // Reset video input
+            videoInput.value = '';
+            
+            console.log('Reset complete');
+        }
+        
+        // Add keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (frames.length === 0) return;
+            
+            switch(e.key) {
+                case 'ArrowLeft':
+                    previousFrame();
+                    break;
+                case 'ArrowRight':
+                    nextFrame();
+                    break;
+                case ' ':
+                    e.preventDefault();
+                    selectCurrentFrame();
+                    break;
+            }
+        });
+        
+        console.log('Frame Extractor ready!');
+        console.log('1. Select a video file');
+        console.log('2. Click "Extract Frames"');
+        console.log('3. Navigate with arrow keys or buttons');
+        console.log('4. Select and download frames');
+    </script>
+</body>
+</html>
